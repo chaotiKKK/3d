@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FreeCam3D · Asset-Handoff-Overhaul — visuelle Erklärung</title>
+<style>
+  :root{
+    --void:#08090c; --steel:#13161c; --slate:#1e222a; --rail:#282d38;
+    --ice:#c8d6e5; --frost:#8899aa; --ghost:#4a5568;
+    --cyan:#00e5cc; --cyan-dim:rgba(0,229,204,.10); --cyan-glow:rgba(0,229,204,.28);
+    --coral:#ff4d6a; --coral-dim:rgba(255,77,106,.12);
+    --amber:#f0a500; --amber-dim:rgba(240,165,0,.10);
+    --mono:ui-monospace,'JetBrains Mono','Cascadia Code',Consolas,monospace;
+    --sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+    --ease:cubic-bezier(.4,0,.2,1);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{background:var(--void);color:var(--ice);font:15px/1.65 var(--sans);-webkit-font-smoothing:antialiased;padding:0 0 80px}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 22px}
+
+  /* ── Hero ── */
+  header.hero{padding:56px 0 34px;border-bottom:1px solid var(--slate);position:relative;overflow:hidden}
+  .kicker{font:500 11px/1 var(--mono);letter-spacing:.24em;color:var(--cyan);text-transform:uppercase;margin-bottom:14px}
+  .kicker::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--cyan);margin-right:8px;vertical-align:1px;box-shadow:0 0 12px var(--cyan-glow)}
+  h1{font-size:clamp(26px,4.4vw,42px);font-weight:700;letter-spacing:-.02em;line-height:1.12}
+  h1 .accent{color:var(--cyan)}
+  .lede{max-width:64ch;color:var(--frost);margin-top:14px;font-size:16px}
+  .lede b{color:var(--ice)}
+  .metaline{margin-top:18px;font:11px/1.7 var(--mono);color:var(--ghost)}
+
+  /* ── Section scaffolding ── */
+  section{padding:46px 0 6px}
+  .sec-tag{font:500 11px/1 var(--mono);letter-spacing:.22em;color:var(--ghost);text-transform:uppercase;margin-bottom:8px}
+  h2{font-size:22px;font-weight:650;letter-spacing:-.01em;margin-bottom:10px}
+  h2 .n{color:var(--cyan);font-family:var(--mono);font-size:15px;vertical-align:2px;margin-right:8px}
+  h3{font-size:15px;font-weight:600;margin:26px 0 8px;color:var(--ice)}
+  p.lede2{max-width:70ch;color:var(--frost);margin-bottom:14px}
+  .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;margin:16px 0}
+  .card{background:var(--steel);border:1px solid var(--slate);border-radius:10px;padding:18px 18px 16px}
+  .card h4{font:600 12px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ice);margin-bottom:8px}
+  .card h4 .dot{color:var(--cyan)}
+  .card p{color:var(--frost);font-size:13.5px}
+  .card p+p{margin-top:8px}
+  code,.mono{font-family:var(--mono)}
+  .kbd{font:500 11px var(--mono);background:var(--void);border:1px solid var(--slate);border-radius:4px;padding:2px 6px;color:var(--cyan)}
+
+  /* ── Pipeline strip ── */
+  .pipe{display:flex;align-items:stretch;gap:0;margin:22px 0 8px;flex-wrap:wrap}
+  .pstep{flex:1 1 150px;background:var(--steel);border:1px solid var(--slate);border-radius:8px;padding:12px 12px 10px;min-width:150px;position:relative}
+  .pstep .t{font:600 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--cyan)}
+  .pstep .d{font-size:12px;color:var(--frost);margin-top:5px;line-height:1.5}
+  .pstep.hot{border-color:var(--cyan-glow);background:linear-gradient(180deg,var(--cyan-dim),var(--steel))}
+  .parr{display:flex;align-items:center;justify-content:center;width:26px;color:var(--ghost);font-size:18px;flex:0 0 26px}
+  @media(max-width:560px){.parr{transform:rotate(90deg)}}
+
+  /* ── Before/After comparison ── */
+  .cmp{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:18px 0}
+  @media(max-width:760px){.cmp{grid-template-columns:1fr}}
+  .cmp .side{background:var(--steel);border:1px solid var(--slate);border-radius:10px;padding:16px}
+  .cmp .side.bad{border-color:rgba(255,77,106,.4)}
+  .cmp .side.good{border-color:var(--cyan-glow)}
+  .cmp .cap{font:600 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
+  .side.bad .cap{color:var(--coral)}
+  .side.good .cap{color:var(--cyan)}
+  ul.tree{list-style:none;font:12px/1.8 var(--mono)}
+  ul.tree li{padding-left:18px;position:relative;color:var(--frost)}
+  ul.tree li::before{content:'└';position:absolute;left:0;color:var(--ghost)}
+  ul.tree li.f{color:var(--ice)}
+  ul.tree li.new{color:var(--cyan)}
+  ul.tree li.new::after{content:' NEU';font-size:9px;letter-spacing:.14em;color:var(--amber)}
+  ul.tree li.miss{color:var(--ghost);text-decoration:line-through}
+  .verdict{margin-top:12px;font:11px/1.7 var(--mono);background:var(--void);border:1px dashed var(--slate);border-radius:6px;padding:8px 10px;color:var(--frost)}
+  .verdict b{color:var(--amber)}
+
+  /* ── scan_meta.json annotation ── */
+  .jsonwrap{display:grid;grid-template-columns:1fr;gap:12px;margin:16px 0}
+  pre.json{background:#0b0e15;border:1px solid var(--slate);border-radius:8px;padding:14px 16px;overflow-x:auto;font:12px/1.75 var(--mono);color:var(--ice)}
+  pre.json .k{color:var(--cyan)}
+  pre.json .s{color:#9fd3b7}
+  pre.json .c{color:var(--ghost);font-style:italic}
+  .annot{background:var(--steel);border-left:2px solid var(--cyan);border-radius:0 8px 8px 0;padding:10px 14px;font-size:13px;color:var(--frost)}
+
+  /* ── Decision tree ── */
+  .treebox{background:var(--steel);border:1px solid var(--slate);border-radius:10px;padding:18px;margin:16px 0;overflow-x:auto}
+  svg{max-width:100%;height:auto;display:block}
+  .node rect{fill:var(--void);stroke:var(--slate);stroke-width:1.5;rx:8}
+  .node text{fill:var(--ice);font:600 12px var(--mono)}
+  .leaf rect{fill:var(--cyan-dim);stroke:var(--cyan-glow)}
+  .leaf text{fill:var(--cyan)}
+  .edge{stroke:var(--ghost);stroke-width:1.4;fill:none}
+  .elabel{fill:var(--frost);font:11px var(--mono)}
+  .legend{font:11px/1.8 var(--mono);color:var(--ghost);margin-top:8px}
+  .legend b{color:var(--ice)}
+
+  /* ── Tables ── */
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--slate);vertical-align:top}
+  th{font:600 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ghost)}
+  td{color:var(--frost)}
+  td code{color:var(--ice);font-size:12px}
+  tr:hover td{background:rgba(30,34,42,.55)}
+  .pill{display:inline-block;font:600 10px var(--mono);letter-spacing:.06em;border-radius:10px;padding:2px 8px;vertical-align:1px}
+  .pill.ok{color:var(--cyan);background:var(--cyan-dim);border:1px solid var(--cyan-glow)}
+  .pill.blur{color:var(--amber);background:var(--amber-dim);border:1px solid rgba(240,165,0,.4)}
+  .pill.bad{color:var(--coral);background:var(--coral-dim);border:1px solid rgba(255,77,106,.4)}
+  .pill.ghost{color:var(--frost);background:var(--steel);border:1px solid var(--slate)}
+
+  /* ── Contact sheet mock ── */
+  .sheetmock{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}
+  .thumb{width:104px;background:var(--steel);border:1px solid var(--slate);border-radius:8px;padding:6px;font-size:0}
+  .thumb .px{height:66px;border-radius:5px;display:flex;align-items:center;justify-content:center;color:var(--ghost);font:11px var(--mono)}
+  .thumb .tag{margin-top:5px;font:600 9.5px var(--mono);letter-spacing:.05em}
+  .thumb.sharp .px{background:repeating-conic-gradient(#c8d6e5 0% 25%,#4a5568 0% 50%) 0 0/16px 16px}
+  .thumb.sharp .tag{color:var(--cyan)}
+  .thumb.flat .px{background:#4a5568}
+  .thumb.flat .tag{color:var(--amber)}
+  .thumb.dark .px{background:#0b0e15;border:1px dashed var(--slate)}
+  .thumb.dark .tag{color:var(--frost)}
+  .thumb.none .px{background:#0b0e15;border:1px dashed var(--slate)}
+  .thumb.none .tag{color:var(--ghost)}
+
+  /* ── Bug before/after ── */
+  .bug{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:16px 0}
+  @media(max-width:760px){.bug{grid-template-columns:1fr}}
+  .bug .side{background:var(--steel);border:1px solid var(--slate);border-radius:10px;padding:16px}
+  .bug .side.bad{border-color:rgba(255,77,106,.4)}
+  .bug .side.good{border-color:var(--cyan-glow)}
+  .bug .cap{font:600 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
+  .bug .side.bad .cap{color:var(--coral)}
+  .bug .side.good .cap{color:var(--cyan)}
+  .flowline{font:12px/2 var(--mono);color:var(--frost)}
+  .flowline .arr{color:var(--ghost)}
+  .flowline .x{color:var(--coral);font-weight:700}
+  .flowline .ok{color:var(--cyan)}
+
+  /* ── Count chart ── */
+  .chart{margin:18px 0;background:var(--steel);border:1px solid var(--slate);border-radius:10px;padding:18px 20px}
+  .bar-row{display:grid;grid-template-columns:76px 1fr 46px;gap:10px;align-items:center;margin:7px 0}
+  .bar-row .lbl{font:600 11px var(--mono);color:var(--frost);text-align:right}
+  .bar-row .val{font:600 12px var(--mono);color:var(--ice)}
+  .bar{height:18px;border-radius:4px;background:linear-gradient(90deg,var(--cyan),rgba(0,229,204,.35));transform-origin:left;transition:transform .5s var(--ease)}
+  .bar.old{background:linear-gradient(90deg,#3a6b64,rgba(0,229,204,.15))}
+  .bar.mid{background:linear-gradient(90deg,#2f5f59,rgba(0,229,204,.22))}
+  .bar.now{background:linear-gradient(90deg,var(--cyan),rgba(0,229,204,.55));box-shadow:0 0 14px var(--cyan-glow)}
+  .chart .note{font:11px var(--mono);color:var(--ghost);margin-top:10px}
+
+  /* ── Callouts ── */
+  .callout{border-radius:10px;padding:16px 18px;margin:20px 0;border:1px solid}
+  .callout .t{font:600 12px var(--mono);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+  .callout.info{background:var(--cyan-dim);border-color:var(--cyan-glow)}
+  .callout.info .t{color:var(--cyan)}
+  .callout.warn{background:var(--amber-dim);border-color:rgba(240,165,0,.4)}
+  .callout.warn .t{color:var(--amber)}
+  .callout p{font-size:13.5px;color:var(--frost)}
+  .callout p+p{margin-top:8px}
+
+  /* ── Footer ── */
+  footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--slate);font:11px/1.8 var(--mono);color:var(--ghost)}
+
+  @media (prefers-reduced-motion: reduce){
+    html{scroll-behavior:auto}
+    .bar{transition:none}
+    .kicker::before{animation:none}
+    *{animation:none!important}
+  }
+  .fade{opacity:0;transform:translateY(8px);transition:opacity .5s var(--ease),transform .5s var(--ease)}
+  .fade.in{opacity:1;transform:none}
+  @media (prefers-reduced-motion: reduce){.fade{opacity:1;transform:none;transition:none}}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="kicker">Visuelle Erklärung · FreeCam3D</div>
+    <h1>Vom Foto zur <span class="accent">pipeline-reifen</span> Aufnahme</h1>
+    <p class="lede">Der Overhaul macht den Export zur <b>Assetschnittstelle</b>: Rezepte setzen den Aufnahmeplan, jede Aufnahme wird mit Winkel und Qualität gestempelt, und <b>ein</b> ZIP liefert Fotos + <code>scan_meta.json</code> + Kontaktbogen + ein Urteil — bereit für RealityScan, Blender und Unreal Engine.</p>
+    <div class="metaline">index.html (single-file, dependency-frei) · ?selftest 69/69 über HTTP · README/AGENTS in Sync</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- 1 · Big picture -->
+  <section>
+    <div class="sec-tag">01 · Das große Bild</div>
+    <h2><span class="n">→</span>Ein Instrument, das Antworten liefert, nicht nur Dateien</h2>
+    <p class="lede2">FreeCam3D ist ein Stereo-3D-Scanner, dessen Ausgabe in Game-Asset-Pipelines fließt (Personen/Umgebungen → Photogrammetrie → Blender-Retopo → UE 5.8). Vor dem Overhaul endete der Scan in einem flachen ZIP — die Frage <i>„Ist das brauchbar?"</i> beantwortete erst RealityScan, nach 90 Fotos. Der Overhaul verschiebt das Urteil in das Instrument selbst.</p>
+    <div class="pipe">
+      <div class="pstep hot"><div class="t">Rezept wählen</div><div class="d">Person / Umgebung / Objekt setzt Interval, Count, Auflösung, Turntable</div></div>
+      <div class="parr">→</div>
+      <div class="pstep hot"><div class="t">Aufnahme</div><div class="d">Photo · Burst · Interval · Turntable — ein gemeinsamer Schritt, Qualität + IMU/TT-Winkel im Meta</div></div>
+      <div class="parr">→</div>
+      <div class="pstep hot"><div class="t">Asset-Bundle</div><div class="d">Ein ZIP: Fotos + scan_meta.json + Kontaktbogen + Beanstandungs-Urteil</div></div>
+      <div class="parr">→</div>
+      <div class="pstep"><div class="t">Downstream</div><div class="d">RealityScan / Blender / UE importieren ohne Raten</div></div>
+    </div>
+  </section>
+
+  <!-- 2 · Old vs new -->
+  <section>
+    <div class="sec-tag">02 · Der Kern des Overhauls</div>
+    <h2><span class="n">⇄</span>Flacher ZIP → Asset-Bundle</h2>
+    <p class="lede2">Die alte Form war der falsche Shape: `project.json` + Bilder, ohne Struktur, ohne Qualitätssignal, ohne Winkel-Kontrakt. Neu kommt <b>ein</b> zusätzlicher Dekodier-Durchlauf hinzu, der gleichzeitig Qualität <i>und</i> Kontaktbogen erzeugt.</p>
+    <div class="cmp">
+      <div class="side bad">
+        <div class="cap">Vorher — flacher Export</div>
+        <ul class="tree">
+          <li class="f">freecam3d_project_….zip</li>
+          <li class="f">project.json</li>
+          <li class="f">cam0_….png / cam1_….jpg …</li>
+          <li class="miss">…und dann raten:</li>
+          <li class="miss">welche Fotos scharf sind</li>
+          <li class="miss">welcher Winkel welchem Bild gehört</li>
+          <li class="miss">ob die Abdeckung reicht</li>
+        </ul>
+        <div class="verdict">Urteil? <b>Nirgends.</b> RealityScan zeigt es dir — nach 90 Fotos.</div>
+      </div>
+      <div class="side good">
+        <div class="cap">Nachher — Asset-Bundle</div>
+        <ul class="tree">
+          <li class="f">freecam3d_project_….zip</li>
+          <li class="f">project.json <span style="color:var(--ghost)">(unverändert, Restore-kompatibel)</span></li>
+          <li class="f">cam0_….png / cam1_….jpg …</li>
+          <li class="new">scan_meta.json</li>
+          <li class="new">contact_sheet.png</li>
+        </ul>
+        <div class="verdict">Urteil im Toast: <b>„… — 2 Aufnahme(n) beanstandet"</b> + Badges auf dem Kontaktbogen.</div>
+      </div>
+    </div>
+    <div class="callout info">
+      <div class="t">Ein Durchlauf, zwei Ergebnisse</div>
+      <p><code>scanShots()</code> dekodiert jeden Blob <b>genau einmal</b> und speist daraus beide Artefakte: die Qualitäts-Flags für <code>scan_meta.json</code> und die Thumbnails für den Kontaktbogen. Bei 150 Fotos = 150 statt 300 Bitmap-Dekodierungen.</p>
+    </div>
+  </section>
+
+  <!-- 3 · Pipeline internals -->
+  <section>
+    <div class="sec-tag">03 · Aufnahmepfad</div>
+    <h2><span class="n">⚙</span>Vier Modi, ein gemeinsamer Schritt</h2>
+    <p class="lede2">Photo, Burst, Interval und Turntable waren vier Kopien derselben inneren Schleife. Der Overhaul extrahiert sie in <code>captureOne()</code> — die Modi unterscheiden sich nur noch in Namens- und Meta-Konstruktion.</p>
+    <div class="treebox">
+      <pre style="font:12px/1.8 var(--mono);color:var(--frost);overflow-x:auto">async function captureOne(cam, name, meta, pending){
+  const b = await captureBlob(vids[cam]); if(!b) return false;   <span style="color:var(--ghost)">// Foto/JPEG vom Stream</span>
+  tick();                                                       <span style="color:var(--ghost)">// hörbarer Pieps (Sound-Toggle)</span>
+  stampFrame(cam);                                              <span style="color:var(--ghost)">// Frame → frames[cam]</span>
+  addShot(cam, name, tagQuality(cam, meta));                    <span style="color:var(--ghost)">// Qualität aus dem Frame, meta unverändert</span>
+  rememberBlob(name, b, 'image/'+fmt());                        <span style="color:var(--ghost)">// IndexedDB + blobByName</span>
+  pending.push({name: name+'.'+fmt(), blob: b});                <span style="color:var(--ghost)">// ZIP-Vorbereitung</span>
+  return true;
+}</pre>
+    </div>
+    <div class="cols">
+      <div class="card">
+        <h4><span class="dot">●</span> tagQuality — Stempel zur Aufnahmezeit</h4>
+        <p><code>assessFrame(frames[cam]).flag</code> → <code>meta.quality</code> als <b>Kopie</b> (das Original-Meta wird nie mutiert). Gute Frames tragen keinen Flag → kein Badge; Blur/Dunkel/Hell erscheinen sofort in der Shot-Liste.</p>
+      </div>
+      <div class="card">
+        <h4><span class="dot">●</span> Shot-Liste mit Badges</h4>
+        <p><code>qBadge(meta)</code> hängt nur <b>Probleme</b> an die Zeile: <span class="pill blur">⚠ blur</span> <span class="pill bad">☀ dunkel</span> <span class="pill ghost">☁ hell</span>. Gute Frames bleiben leise — das ✓ erscheint erst im Kontaktbogen.</p>
+      </div>
+      <div class="card">
+        <h4><span class="dot">●</span> Winkel-Typ im Vertrag</h4>
+        <p>Orbit (IMU): <code>meta.imu===true</code> → <code>angle_type:'orbit'</code>. Turntable (getippte Winkel): <code>meta.angle</code> ohne IMU-Flag → <code>'turntable'</code>. Sonst <code>null</code>.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 · scan_meta contract -->
+  <section>
+    <div class="sec-tag">04 · Der Vertrag</div>
+    <h2><span class="n">📄</span>scan_meta.json — maschinenlesbar, additiv, rückwärtskompatibel</h2>
+    <p class="lede2">Alte Restores ignorieren unbekannte Schlüssel, also bricht der neue Block nichts. Jede Downstream-Stufe findet Winkel, Qualität und Dimensionen ohne Raten.</p>
+    <div class="jsonwrap">
+      <pre class="json">{
+  <span class="k">"exported"</span>: <span class="s">"freecam3d-scan"</span>,        <span class="c">// Vertrags-Kennung</span>
+  <span class="k">"cam_count"</span>: 3,
+  <span class="k">"baseline_mm"</span>: 60, <span class="k">"focal_px"</span>: 1000,
+  <span class="k">"calibrated"</span>: false,
+  <span class="k">"preset"</span>: <span class="s">"person"</span>,                  <span class="c">// Rezept aus dem Overhaul</span>
+  <span class="k">"shots"</span>: [
+    { <span class="k">"name"</span>: <span class="s">"a90_cam0_…"</span>, <span class="k">"camera_id"</span>: 0, <span class="k">"ts"</span>: <span class="s">"…"</span>,
+      <span class="k">"angle_deg"</span>: 90, <span class="k">"angle_type"</span>: <span class="s">"orbit"</span>, <span class="k">"quality"</span>: <span class="s">"ok"</span> },
+    { <span class="k">"name"</span>: <span class="s">"angle_45_cam1_…"</span>, <span class="k">"camera_id"</span>: 1, <span class="k">"ts"</span>: <span class="s">"…"</span>,
+      <span class="k">"angle_deg"</span>: 45, <span class="k">"angle_type"</span>: <span class="s">"turntable"</span>, <span class="k">"quality"</span>: <span class="s">"blur"</span> },
+    { <span class="k">"name"</span>: <span class="s">"video_cam0_….webm"</span>, <span class="k">"camera_id"</span>: 0, <span class="k">"ts"</span>: <span class="s">"…"</span>,
+      <span class="k">"angle_deg"</span>: null, <span class="k">"angle_type"</span>: null, <span class="k">"quality"</span>: null }
+  ]
+}</pre>
+      <div class="annot"><b>Kontrakt-Felder:</b> <code>exported</code> identifiziert das Format · <code>preset</code> dokumentiert das Rezept · pro Shot <code>angle_deg</code>/<code>angle_type</code> aus Orbit-IMU bzw. Turntable-Meta · <code>quality</code> aus der Triage (autoritative Flags zur Exportzeit, nicht die Capture-Badges).</div>
+    </div>
+  </section>
+
+  <!-- 5 · Triage -->
+  <section>
+    <div class="sec-tag">05 · Die Qualitäts-Triage</div>
+    <h2><span class="n">▦</span>Wie assessFrame ein Foto beurteilt</h2>
+    <p class="lede2">Downscale auf 64×48, dann zwei Kennzahlen: <b>Mittelluma</b> (Belichtung) und <b>mittlere Laplace-Varianz</b> (Schärfe/Kontrast). Reine Funktion — keine Seiteneffekte, deterministisch, selftested.</p>
+    <div class="treebox">
+      <svg viewBox="0 0 760 240" role="img" aria-label="Entscheidungsbaum der Qualitäts-Triage">
+        <defs>
+          <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#8899aa"/>
+          </marker>
+        </defs>
+        <!-- input -->
+        <g class="node"><rect x="290" y="12" width="180" height="40"/><text x="380" y="37" text-anchor="middle">Frame (64×48)</text></g>
+        <!-- luma branch -->
+        <path class="edge" d="M350,52 C310,90 270,100 240,118" marker-end="url(#arr)"/>
+        <text class="elabel" x="285" y="88">luma &lt; 60</text>
+        <path class="edge" d="M410,52 C450,90 490,100 520,118" marker-end="url(#arr)"/>
+        <text class="elabel" x="470" y="88">luma &gt; 200</text>
+        <path class="edge" d="M380,52 C380,90 380,118 380,148" marker-end="url(#arr)"/>
+        <text class="elabel" x="392" y="100">sonst</text>
+        <g class="leaf"><rect x="160" y="120" width="160" height="38"/><text x="240" y="144" text-anchor="middle">☀ dunkel</text></g>
+        <g class="leaf"><rect x="600" y="120" width="160" height="38"/><text x="680" y="144" text-anchor="middle">☁ hell</text></g>
+        <!-- laplacian branch -->
+        <path class="edge" d="M330,158 C300,180 280,190 260,210" marker-end="url(#arr)"/>
+        <text class="elabel" x="292" y="188">Laplace ≥ 14</text>
+        <path class="edge" d="M430,158 C470,180 490,190 510,210" marker-end="url(#arr)"/>
+        <text class="elabel" x="470" y="188">Laplace &lt; 14</text>
+        <g class="node"><rect x="180" y="212" width="160" height="38"/><text x="260" y="236" text-anchor="middle" style="fill:#00e5cc">✓ ok (flag null)</text></g>
+        <g class="leaf"><rect x="430" y="212" width="160" height="38"/><text x="510" y="236" text-anchor="middle">⚠ blur</text></g>
+      </svg>
+      <div class="legend">Kalibriert an synthetischen Frames: flach (lv ≈ 0) → <b>blur</b> · Schachbrett (lv ≈ 135) → <b>ok</b> · Schwarz/Weiß → <b>dunkel/hell</b>. Der Schwellwert 14 ist ein Heuristik-Wert — reale Fotos variieren.</div>
+    </div>
+    <div class="sheetmock">
+      <div class="thumb sharp"><div class="px"></div><div class="tag">✓ ok</div></div>
+      <div class="thumb flat"><div class="px"></div><div class="tag">⚠ blur</div></div>
+      <div class="thumb dark"><div class="px"></div><div class="tag">☀ dunkel</div></div>
+      <div class="thumb none"><div class="px"></div><div class="tag">kein Bild</div></div>
+    </div>
+    <div class="callout info">
+      <div class="t">Flag-Semantik: null = ok</div>
+      <p><code>assessFrame</code> liefert <code>flag: null</code> für scharfe, gut belichtete Frames. Das Literal <code>'ok'</code> entsteht erst in <code>scanShots</code> per <code>flag || 'ok'</code> — ein selftest-Fehler in diesem Thread entstand genau aus dieser Verwechslung (Check prüfte <code>flag==='ok'</code> gegen den null-Sentinel).</p>
+    </div>
+  </section>
+
+  <!-- 6 · Recipes -->
+  <section>
+    <div class="sec-tag">06 · Scan-Rezepte</div>
+    <h2><span class="n">▤</span>Ein Klick auf den Aufnahmeplan</h2>
+    <p class="lede2">Die Rezept-Sektion zwischen Cameras und Capture setzt die bestehenden Felder — user-adjustierbar danach, persistiert via <code>Save.preset</code>, und im <code>scan_meta.json</code> dokumentiert.</p>
+    <table>
+      <thead><tr><th>Rezept</th><th>Interval</th><th>Count</th><th>TT Frames / Winkel / Settle</th><th>Auflösung · Format</th><th>Spec-Zeile</th></tr></thead>
+      <tbody>
+        <tr><td><code>person</code></td><td>2 s</td><td>90</td><td>—</td><td>1920×1080 · JPG 95</td><td><code>≈90 F · alle 2 s · 1920×1080 · JPG 95</code></td></tr>
+        <tr><td><code>umgebung</code></td><td>1,5 s</td><td>150</td><td>—</td><td>1920×1080 · JPG 95</td><td><code>≈150 F · alle 1,5 s · 1920×1080 · JPG 95</code></td></tr>
+        <tr><td><code>objekt</code></td><td>—</td><td>—</td><td>48 / 7,5° / 1 s</td><td>1920×1080 · JPG 95</td><td><code>48 F · 7,5° · settle 1 s · 1920×1080 · JPG 95</code></td></tr>
+        <tr><td><code>manuell</code></td><td colspan="4">liest die Live-Felder zurück</td><td><code>Live: 33 F · alle 4 s · 1920×1080 · JPG 95</code></td></tr>
+      </tbody>
+    </table>
+    <div class="cols">
+      <div class="card">
+        <h4><span class="dot">●</span> applyRecipe</h4>
+        <p>Setzt <code>selRes</code>/<code>selFmt</code>/<code>rngQ</code> (+ <code>numInt</code>/<code>numTot</code> bzw. <code>numTT</code>/<code>numTA</code>/<code>numTS</code>), persistiert <code>Save.preset</code>, ruft <code>saveSettings()</code> — MANUELL fasst die Felder nicht an.</p>
+      </div>
+      <div class="card">
+        <h4><span class="dot">●</span> recipeSpec — die Signatur</h4>
+        <p>Pure Funktion, eine Zeile in Instrumentensprache: <code>≈90 F · alle 2 s · 1920×1080 · JPG 95</code>. Objekt nutzt deutsches Dezimalkomma (<code>7,5°</code>). Boot rendert das persistierte Rezept.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 · Bug story -->
+  <section>
+    <div class="sec-tag">07 · Root Cause unterwegs</div>
+    <h2><span class="n">🐞</span>Der Export-Bug, den der Rebuild aufdeckte</h2>
+    <p class="lede2">Der erste End-to-End-Test des Bundles schlug fehl: Bilder wurden nicht eingebettet, alle Qualitäts-Flags waren <code>null</code>. Systematisches Debugging (Phase 1) fand die Ursache am Quellpunkt — nicht am Symptom.</p>
+    <div class="bug">
+      <div class="side bad">
+        <div class="cap">Vorher — Schlüssel statt Record</div>
+        <div class="flowline">
+          <span class="x">rememberBlob:</span> blobByName[name] = <b>42</b> <span class="x">(IDB-Key)</span><br>
+          <span class="arr">→</span> Export: rec.b → <span class="x">undefined</span> → Bild fehlt, Flag null<br>
+          <span class="arr">→</span> Nach Reload (restoreBlobIndex): Records → Export klappte<br>
+          <span class="arr">→</span> <span class="x">Live-Sessions exportierten still nie Bilder</span>
+        </div>
+      </div>
+      <div class="side good">
+        <div class="cap">Nachher — Record wie überall sonst</div>
+        <div class="flowline">
+          <span class="ok">rememberBlob:</span> blobByName[name] = <b>{n, b, t}</b> <span class="ok">(via dbGet(k))</span><br>
+          <span class="arr">→</span> Export: rec.b → Bild eingebettet, Flag korrekt<br>
+          <span class="arr">→</span> Konsistent mit restoreBlobIndex + Restore-Pfad
+        </div>
+      </div>
+    </div>
+    <div class="callout warn">
+      <div class="t">Lektion</div>
+      <p>Zwei Schreibpfade mit unterschiedlichen Shapes in einem Index sind ein Zeitbomben-Muster: <code>blobByName</code> hielt mal Keys (live), mal Records (nach Reload). Der Fix stellt den einen konsistenten Vertrag her — <b>Record</b> <code>{n, b, t}</code> — und die <code>blobByName</code>-Keying-Konvention (Shot-Name ↔ IDB-Record) bleibt erhalten.</p>
+    </div>
+  </section>
+
+  <!-- 8 · Selftest growth -->
+  <section>
+    <div class="sec-tag">08 · Vertrauen messbar gemacht</div>
+    <h2><span class="n">▥</span>Selftest: 30 → 69 Prüfungen in diesem Thread</h2>
+    <p class="lede2">Jede Verhaltensänderung wird von reinen Checks abgedeckt; die Zählweise ist dreifach dokumentiert (index.html, README.md, AGENTS.md) und muss zusammen aktualisiert werden.</p>
+    <div class="chart" id="chart" role="img" aria-label="Selftest-Wachstum von 30 auf 69 Prüfungen">
+      <div class="bar-row"><div class="lbl">Thread-Start</div><div class="bar old" style="width:43.5%"></div><div class="val">30</div></div>
+      <div class="bar-row"><div class="lbl">+ Onboarding</div><div class="bar mid" style="width:65%"></div><div class="val">45</div></div>
+      <div class="bar-row"><div class="lbl">+ Kontext-Schritte</div><div class="bar mid" style="width:72.5%"></div><div class="val">50</div></div>
+      <div class="bar-row"><div class="lbl">+ Ton-Toggle</div><div class="bar mid" style="width:78%"></div><div class="val">54</div></div>
+      <div class="bar-row"><div class="lbl">+ Asset-Handoff</div><div class="bar mid" style="width:90%"></div><div class="val">62</div></div>
+      <div class="bar-row"><div class="lbl">Overhaul</div><div class="bar now" style="width:100%"></div><div class="val">69</div></div>
+      <div class="note">Zählweise: 66 feste + 1 gated Worker-Parität = 67 in jeder Umgebung · +2 HTTP-only SW/Cache = 69/69 über HTTP, 67/67 über file://</div>
+    </div>
+  </section>
+
+  <!-- 9 · Tradeoffs -->
+  <section>
+    <div class="sec-tag">09 · Ehrliche Restpunkte</div>
+    <h2><span class="n">⚖</span>Bewusste Tradeoffs</h2>
+    <div class="callout warn">
+      <div class="t">Was bewusst nicht gebaut wurde</div>
+      <p><b>Kein Live-Coach</b> (Coverage-Ring, Bewegungs-Warnungen) — die nötigen Winkel-/Qualitäts-Meta existieren bereits, der Coach ist ein sauberer Folge-Baustein. <b>Kein Amber-Geräte-Fallback</b> in den Rezepten — die maximale Auflösung pro Gerät ist vor der Aufnahme nicht billig bestimmbar; die Auflösungs-Selectliste bietet ohnehin nur unterstützte Größen. <b>Kein HTML-Report</b> — Kontaktbogen + Urteil + JSON tragen die Information; Prosa-Report nur, wenn eine Stufe ihn wirklich braucht.</p>
+    </div>
+    <div class="callout info">
+      <div class="t">Bekannte Unsicherheit</div>
+      <p>Der <b>Blur-Schwellwert (Laplace ≥ 14)</b> ist gegen synthetische Frames kalibriert (flach ≈ 0, Schachbrett ≈ 135) — reale Motive liegen dazwischen, das Heuristik-Risiko (falsch-positive „blur"-Flags bei texturarmen Flächen) ist dokumentiert, nicht wegdiskutiert. Außerdem: Capture-Badges (aus dem gegriffenen Frame) und Export-Flags (aus dem gespeicherten Blob) können theoretisch minimal abweichen — die Export-Flags sind autoritativ.</p>
+    </div>
+  </section>
+
+  <footer>
+    Erklärt den Asset-Handoff-Overhaul aus diesem Thread (index.html, selftest 69/69, README/AGENTS in Sync).<br>
+    Alle Werte, Schwellwerte und Kontraktfelder entsprechen dem tatsächlich implementierten Stand — keine dekorativen Zahlen.
+  </footer>
+
+</div>
+
+<script>
+  // Sanftes Einblenden beim Scrollen (reduced-motion respektiert durch CSS)
+  const io = new IntersectionObserver((es) => {
+    for (const e of es) if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+  }, { threshold: 0.12 });
+  document.querySelectorAll('section').forEach(s => { s.classList.add('fade'); io.observe(s); });
+  // Console-Signal für die Verifikation
+  console.log('[explainer] asset-handoff-overhaul ready');
+</script>
+</body>
+</html>
