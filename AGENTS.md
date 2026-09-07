@@ -33,6 +33,20 @@ Project: **FreeCam3D** — single-file HTML stereo 3D scanner PWA.
   returns — non-flaky, like the SW checks) run in every context; +2 HTTP-only
   SW/cache checks → **69/69 over HTTP, 67/67 over `file://`** (the 2-check
   delta is exactly the SW/cache checks).
+- **CI harness:** `node .build/ci-selftest.mjs <http(s)-url>` asserts the
+  `SELFTEST n/n` title via CDP on a live headless page (Node ≥ 22 built-in
+  WebSocket, dependency-free; exit 0/1). One-shot `--dump-dom` can NEVER
+  verify this app: the selftest IIFE awaits zip/worker/SW activation and sets
+  the title after the load event, and `--virtual-time-budget` fast-forwards
+  the 4 s check timeouts past real-time SW activation (observed false
+  negative 67/69). A fresh profile reaches 69/69 because `sw.js` precaches
+  the shell at install with `skipWaiting`/`clients.claim`. On Windows the
+  Edge profile dir is briefly locked after kill — cleanup retries must not
+  override the verdict's exit code. Structure: verdict policy (parse/
+  classify/early-exit) lives in `.build/verdict.mjs` (pure, tested via `node
+  --test .build/verdict.test.mjs`); `ci-selftest.mjs` is engine+CLI and
+  imports it (never vice versa). `.github/workflows/selftest.yml` depends on
+  the harness — commit `.build/` or the workflow fails.
 - Over `file://` the service-worker/cache checks are silently skipped (gated on
   `location.protocol.startsWith('http')` + `sw.js` reachable). Serve over HTTP(S)
   to exercise them: `python -m http.server 8080` in this dir, then
@@ -63,6 +77,15 @@ Project: **FreeCam3D** — single-file HTML stereo 3D scanner PWA.
   *Load Frame L/R* and run stereo from the stored frames.
 - Secure context required: camera, service worker, and install prompt need HTTPS
   or localhost — `file://` won't do.
+- APK shell (index.html stays untouched): `bash .build/apk/build-apk.sh` builds
+  `FreeCam3D.apk` at repo root from a project-local toolchain in `.build/apk/`
+  (Temurin 17 + build-tools 34; hand-built aapt2→javac→d8→aapt add→zipalign→apksigner,
+  no gradle; on Windows `d8`/`apksigner` must be called as `.bat`).
+  WebViewAssetLoader serves assets at `https://appassets.androidplatform.net/assets/`
+  (secure context → getUserMedia works). Exports ride an injected `downloadBlob(blob,fn)`
+  override → `FreeCamNative.saveB64` → MediaStore Downloads (API ≥29) / app dir (≤28).
+  WebView has no service worker → the in-APK selftest reads 67/69 (the 2 `pwa:` checks
+  fail); expected, not a regression.
 
 ## Architecture notes (post-fix)
 - **Depth pipeline is decoupled** from live video: `getGray`/`getRGB` take a

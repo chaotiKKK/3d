@@ -1,0 +1,34 @@
+# FreeCam3D CI: serve the app over HTTP and assert the ?selftest result.
+# The harness drives a real headless browser via CDP (Node >= 22 built-in
+# WebSocket, no dependencies): the selftest is an async boot IIFE that sets
+# document.title only after the load event, so a plain curl/--dump-dom check
+# can never see it. A failing assertion exits non-zero and fails the job.
+name: selftest
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Unit-test the verdict policy
+        run: node --test .build/verdict.test.mjs
+
+      - name: Serve app over HTTP
+        run: |
+          python3 -m http.server 8080 &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8080/index.html > /dev/null && break
+            sleep 1
+          done
+
+      - name: Run CI selftest harness
+        run: node .build/ci-selftest.mjs "http://localhost:8080/?selftest"
