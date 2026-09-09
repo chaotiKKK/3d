@@ -3,6 +3,8 @@
 # WebSocket, no dependencies): the selftest is an async boot IIFE that sets
 # document.title only after the load event, so a plain curl/--dump-dom check
 # can never see it. A failing assertion exits non-zero and fails the job.
+# ui-smoke is a second, independent job: Playwright walks the real UI
+# (onboarding, scan recipes) on a fresh profile and uploads screenshots.
 name: selftest
 on:
   push:
@@ -32,3 +34,36 @@ jobs:
 
       - name: Run CI selftest harness
         run: node .build/ci-selftest.mjs "http://localhost:8080/?selftest"
+
+  ui-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Playwright + Chromium
+        run: |
+          python3 -m pip install playwright==1.62.0
+          python3 -m playwright install --with-deps chromium
+
+      - name: Serve app over HTTP
+        run: |
+          python3 -m http.server 8080 &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8080/index.html > /dev/null && break
+            sleep 1
+          done
+
+      - name: Run Playwright UI smoke
+        run: python3 .build/ui-smoke.py
+
+      - name: Upload smoke screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-smoke-shots
+          path: .build/ui-shots/
+          retention-days: 7

@@ -34,6 +34,36 @@ const POLL_MS = 300;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Fell every <exe> process whose command line carries <marker>, then reap.
+// Returns when no matching process remains (or after ~5 s). PowerShell only:
+// no WMIC (deprecated/absent on new Windows), no external deps.
+function killByMarker(exe, marker) {
+  return new Promise((resolve) => {
+    const ps =
+      `Get-CimInstance Win32_Process -Filter "Name='${exe}.exe'" | ` +
+      `Where-Object { $_.CommandLine -like '*${marker}*' } | ` +
+      `ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`;
+    let left = 5;
+    const reap = () => {
+      const q = spawn('powershell', ['-NoProfile', '-Command',
+        `@(Get-CimInstance Win32_Process -Filter "Name='${exe}.exe'" | ` +
+        `Where-Object { $_.CommandLine -like '*${marker}*' } | Measure-Object).Count`],
+        { windowsHide: true });
+      let out = '';
+      q.stdout.on('data', (d) => { out += d; });
+      q.on('close', (n) => {
+        if (n === 0 && parseInt(out.trim(), 10) === 0) return resolve();
+        if (--left <= 0) return resolve();
+        setTimeout(reap, 300);
+      });
+      q.on('error', () => resolve());
+    };
+    const k = spawn('powershell', ['-NoProfile', '-Command', ps], { windowsHide: true, stdio: 'ignore' });
+    k.on('error', () => resolve());
+    k.on('close', () => setTimeout(reap, 200));
+  });
+}
+
 function freePort() {
   return new Promise((resolve, reject) => {
     const s = createServer();
@@ -49,7 +79,11 @@ async function findPageTarget(port, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/json/list`);
+      const res = await fetch(`http://127.0.0.1:${port}/json/list`, {
+        // Bounded per attempt: an accept-but-never-respond socket must not
+        // stall the loop past the deadline (observed under machine load).
+        signal: AbortSignal.timeout(1500),
+      });
       const targets = await res.json();
       const page = targets.find((t) => t.type === 'page' && t.webSocketDebuggerUrl);
       if (page) return page;
@@ -83,12 +117,21 @@ function send(ws, closed, id, method, params) {
 async function waitForTitle(wsUrl, timeoutMs) {
   const ws = new WebSocket(wsUrl);
   // undici's WebSocket throws on send() while CONNECTING — wait for open.
-  const connected = await new Promise((resolve) => {
-    ws.addEventListener('open', () => resolve(true), { once: true });
-    ws.addEventListener('error', () => resolve(false), { once: true });
-    ws.addEventListener('close', () => resolve(false), { once: true });
-  });
-  if (!connected) return fail('devtools connection failed');
+  // The handshake itself is raced against a budget: a never-completing
+  // handshake must not hang past the advertised timeout.
+  const HANDSHAKE_MS = 5000;
+  const connected = await Promise.race([
+    new Promise((resolve) => {
+      ws.addEventListener('open', () => resolve(true), { once: true });
+      ws.addEventListener('error', () => resolve(false), { once: true });
+      ws.addEventListener('close', () => resolve(false), { once: true });
+    }),
+    sleep(HANDSHAKE_MS).then(() => false),
+  ]);
+  if (!connected) {
+    try { ws.close(); } catch { /* already closed */ }
+    return fail(`devtools connection failed within ${HANDSHAKE_MS}ms`);
+  }
   const deadline = Date.now() + timeoutMs;
   const closed = new Promise((resolve) => {
     ws.addEventListener('close', () => resolve(), { once: true });
@@ -97,6 +140,11 @@ async function waitForTitle(wsUrl, timeoutMs) {
   let lastTitle = null;
   let sinceChange = Date.now();
   let id = 0;
+  // The loop body returns the verdict from several points; funnel them
+  // through one place so the socket can be closed before returning — an
+  // open DevTools WebSocket keeps the event loop alive and the process
+  // would hang after printing its verdict (observed under machine load).
+  async function poll() {
   while (Date.now() < deadline) {
     // Race the CDP request against the remaining budget: a hung renderer or
     // dead target must not outlive the advertised timeout.
@@ -116,6 +164,10 @@ async function waitForTitle(wsUrl, timeoutMs) {
     await sleep(POLL_MS);
   }
   return fail(`timeout after ${timeoutMs}ms (title=${JSON.stringify(lastTitle)})`);
+  }
+  const verdict = await poll();
+  try { ws.close(); } catch { /* already closed */ }
+  return verdict;
 }
 
 async function main() {
@@ -156,7 +208,20 @@ async function main() {
       process.exitCode = 1;
     }
   } finally {
-    if (child && !child.killed) { try { child.kill(); } catch { /* ignore */ } }
+    if (child) {
+      // Edge's launcher can exit early while its child tree lives on —
+      // killing the launcher PID is then a no-op and the tree becomes an
+      // orphan swarm holding the profile dir (observed: 17 stray
+      // msedge.exe). On Windows, fell every browser process whose command
+      // line carries the unique profile marker instead: independent of the
+      // tree's shape. Non-Windows CI launchers stay alive, so kill() works.
+      if (process.platform === 'win32') {
+        const exe = browser.split(/[\\/]/).pop().replace(/\.exe$/i, '');
+        await killByMarker(exe, 'ci-selftest-');
+      } else {
+        try { child.kill(); } catch { /* ignore */ }
+      }
+    }
     // Windows: Edge's child processes hold the profile dir for a moment after
     // kill(); cleanup must never override the verdict's exit code, so retry
     // and give up silently rather than throw.

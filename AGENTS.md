@@ -52,7 +52,13 @@ Project: **FreeCam3D** — single-file HTML stereo 3D scanner PWA.
   classify/early-exit) lives in `.build/verdict.mjs` (pure, tested via `node
   --test .build/verdict.test.mjs`); `ci-selftest.mjs` is engine+CLI and
   imports it (never vice versa). `.github/workflows/selftest.yml` depends on
-  the harness — commit `.build/` or the workflow fails.
+  the harness — commit `.build/` or the workflow fails. Three Windows/load
+  pitfalls fixed after they produced real hangs/orphans: the DevTools WebSocket
+  must be closed after the verdict (an open socket keeps Node alive → process
+  hangs after printing PASS); Edge launchers can exit early so `child.kill()`
+  orphans the tree — kill by the `ci-selftest-` profile marker via PowerShell
+  (`killByMarker`) instead of by PID; `findPageTarget`'s fetch and the WS
+  handshake both need their own bounded timeouts.
 - Over `file://` the service-worker/cache checks are silently skipped (gated on
   `location.protocol.startsWith('http')` + `sw.js` reachable). Serve over HTTP(S)
   to exercise them: `python -m http.server 8080` in this dir, then
