@@ -5,6 +5,10 @@
 # can never see it. A failing assertion exits non-zero and fails the job.
 # ui-smoke is a second, independent job: Playwright walks the real UI
 # (onboarding, scan recipes) on a fresh profile and uploads screenshots.
+# apk is a third: the committed hand-built pipeline must keep producing a
+# signed, installable shell with a byte-identical embedded webapp on every
+# push (regression net for the Android side — on-device behavior itself is
+# verified locally via the AVD recipe in AGENTS.md).
 name: selftest
 on:
   push:
@@ -67,3 +71,26 @@ jobs:
           name: ui-smoke-shots
           path: .build/ui-shots/
           retention-days: 7
+
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Build APK (hand-built pipeline, no gradle)
+        run: bash .build/apk/build-apk.sh
+
+      - name: Verify signature
+        run: "$ANDROID_HOME/build-tools/34.0.0/apksigner verify --print-certs FreeCam3D.apk"
+
+      - name: Check badging + embedded webapp byte-identity
+        run: |
+          "$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging FreeCam3D.apk | grep -E "package:|launchable-activity|uses-permission"
+          mkdir -p /tmp/apkcheck && cd /tmp/apkcheck
+          unzip -o -q "$GITHUB_WORKSPACE/FreeCam3D.apk" assets/index.html
+          cmp "$GITHUB_WORKSPACE/index.html" assets/index.html && echo "index.html embedded byte-identical"

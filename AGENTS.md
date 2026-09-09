@@ -94,13 +94,31 @@ Project: **FreeCam3D** — single-file HTML stereo 3D scanner PWA.
 - APK shell (index.html stays untouched): `bash .build/apk/build-apk.sh` builds
   `FreeCam3D.apk` at repo root from a project-local toolchain in `.build/apk/`
   (Temurin 17 + build-tools 34; hand-built aapt2→javac→d8→aapt add→zipalign→apksigner,
-  no gradle; on Windows `d8`/`apksigner` must be called as `.bat`).
+  no gradle; on Windows `d8`/`apksigner` must be called as `.bat`). CI mode: if
+  `.build/apk/jdk/` is absent the script falls back to `JAVA_HOME`, and if
+  `.build/apk/android-sdk/build-tools/34.0.0` is absent to `ANDROID_HOME` — the
+  workflow's `apk` job relies on this (GitHub's ubuntu image ships build-tools
+  34.0.0 + android-34; setup-java provides JDK 17).
   WebViewAssetLoader serves assets at `https://appassets.androidplatform.net/assets/`
   (secure context → getUserMedia works). Exports ride an injected `downloadBlob(blob,fn)`
   override → `FreeCamNative.saveB64` → MediaStore Downloads (API ≥29) / app dir (≤28).
   WebView has no service worker → the in-APK selftest reads 67/69 (the 2 `pwa:` checks
-  fail); expected, not a regression. `debug.keystore` is untracked — a regenerated
-  one changes the signature, so older phone installs must be uninstalled first.
+  fail); expected, not a regression — **now verified live on an emulator** (see below).
+  `debug.keystore` is untracked — a regenerated one changes the signature, so older
+  phone installs must be uninstalled first.
+- **APK verified on-device (headless AVD recipe):** webkit's `WebViewAssetLoader`
+  needs `androidx.core.util.Pair` at runtime — first launch crashed with
+  `ClassNotFoundException` until `build-apk.sh` also dexed core-util.jar (extracted
+  `androidx/core/util` from androidx core 1.9.0, avoiding the kotlin cascade).
+  WebView debugging is enabled in MainActivity (`.build/apk/cdp-verify.mjs` drives
+  the page over `adb forward tcp:9222 localabstract:webview_devtools_remote_<pid>`,
+  pid from `pidof`). Emulator: `avdmanager create avd -n fc3d -k
+  system-images;android-34;google_apis;x86_64` + AEHD driver (elevation needed, the
+  SDK's `silent_install.bat` fails silently when run through an already-elevated
+  wrapper — capture its log); boot flags `-no-window -camera-front emulated -camera-back
+  virtualscene -gpu swiftshader_indirect`. Verified live: getUserMedia yields real
+  frames (`camera2 1, facing back` 480×640), patched `downloadBlob` writes exact bytes
+  to `/sdcard/Download/`, selftest 67/69 with only the 2 `pwa:` checks failing.
 
 ## Architecture notes (post-fix)
 - **Depth pipeline is decoupled** from live video: `getGray`/`getRGB` take a
