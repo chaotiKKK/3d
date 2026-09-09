@@ -115,6 +115,9 @@ public class MainActivity extends Activity {
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setMediaPlaybackRequiresUserGesture(false);
+        // Verification build: expose the WebView's DevTools endpoint so CDP
+        // (chrome://inspect / raw WebSocket) can drive and inspect the page.
+        WebView.setWebContentsDebuggingEnabled(true);
         web.addJavascriptInterface(new NativeSaver(), "FreeCamNative");
         web.setWebViewClient(new WebViewClientCompat() {
             @Override
