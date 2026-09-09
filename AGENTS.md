@@ -116,9 +116,14 @@ Project: **FreeCam3D** — single-file HTML stereo 3D scanner PWA.
   system-images;android-34;google_apis;x86_64` + AEHD driver (elevation needed, the
   SDK's `silent_install.bat` fails silently when run through an already-elevated
   wrapper — capture its log); boot flags `-no-window -camera-front emulated -camera-back
-  virtualscene -gpu swiftshader_indirect`. Verified live: getUserMedia yields real
+  virtualscene -gpu swiftshader_indirect`.  Verified live: getUserMedia yields real
   frames (`camera2 1, facing back` 480×640), patched `downloadBlob` writes exact bytes
   to `/sdcard/Download/`, selftest 67/69 with only the 2 `pwa:` checks failing.
+  The same four checks run automated as `bash .build/apk/emulator-smoke.sh` (local,
+  against a running AVD/app) and as the workflow's `apk-emulator` job (CI: KVM check,
+  sdkmanager emulator+image, headless AVD boot with a 420 s timeout, install,
+  pre-grant CAMERA, smoke); the script launches the app itself with retries and
+  derives the DevTools socket from `/proc/net/unix` — no hardcoded pid.
 
 ## Architecture notes (post-fix)
 - **Depth pipeline is decoupled** from live video: `getGray`/`getRGB` take a

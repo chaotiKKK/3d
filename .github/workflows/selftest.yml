@@ -9,6 +9,10 @@
 # signed, installable shell with a byte-identical embedded webapp on every
 # push (regression net for the Android side — on-device behavior itself is
 # verified locally via the AVD recipe in AGENTS.md).
+# apk-emulator is the fourth: boots the API-34 headless AVD with KVM and
+# runs the on-emulator checks (secure context, camera bridge, MediaStore
+# export, in-APK selftest 67/69) through cdp-verify.mjs — the CI mirror of
+# the local AVD verification recipe.
 name: selftest
 on:
   push:
@@ -94,3 +98,59 @@ jobs:
           mkdir -p /tmp/apkcheck && cd /tmp/apkcheck
           unzip -o -q "$GITHUB_WORKSPACE/FreeCam3D.apk" assets/index.html
           cmp "$GITHUB_WORKSPACE/index.html" assets/index.html && echo "index.html embedded byte-identical"
+
+  apk-emulator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check KVM acceleration (required by the emulator)
+        run: |
+          if [ ! -e /dev/kvm ]; then
+            echo "::error::/dev/kvm not available — KVM is required for the emulator on hosted runners"
+            exit 1
+          fi
+          if command -v kvm-ok > /dev/null; then kvm-ok; else echo "/dev/kvm present (kvm-ok not installed)"; fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install emulator + system image (sdkmanager)
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "emulator" "system-images;android-34;google_apis;x86_64" > /dev/null
+
+      - name: Create + boot headless AVD
+        run: |
+          echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd \
+            -n fc3d-ci -k "system-images;android-34;google_apis;x86_64" -d pixel_5 --force
+          "$ANDROID_HOME/emulator/emulator" -avd fc3d-ci \
+            -no-window -no-audio -no-boot-anim \
+            -camera-front emulated -camera-back virtualscene \
+            -gpu swiftshader_indirect -no-snapshot \
+            > /tmp/emulator-ci.log 2>&1 &
+          echo "emulator pid $!"
+          timeout 420 bash -c 'while [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" != "1" ]; do sleep 5; done' \
+            || { echo "::error::emulator did not boot in 420s"; tail -30 /tmp/emulator-ci.log; exit 1; }
+          echo "BOOTED"
+
+      - name: Build APK (reuse the committed pipeline)
+        run: bash .build/apk/build-apk.sh
+
+      - name: Install APK + pre-grant camera
+        run: |
+          adb install -r FreeCam3D.apk
+          adb shell pm grant com.freecam3d.app android.permission.CAMERA
+
+      - name: Run on-emulator smoke (camera bridge, MediaStore export, selftest)
+        run: bash .build/apk/emulator-smoke.sh
+
+      - name: Upload emulator log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: emulator-log
+          path: /tmp/emulator-ci.log
+          retention-days: 7
