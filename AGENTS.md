@@ -203,7 +203,14 @@ Project: **FreeCam3D** — single-file HTML stereo 3D scanner PWA.
   verify camera-pipeline work via the frame path (upload/`setFrame` → Compute
   Depth → export) instead, and verify downloads by stashing
   `URL.createObjectURL` blobs inside eval (inspect header/size, e.g. PLY =
-  `ply\nformat`).
+  `ply\nformat`). For browser-level capture tests use Playwright +
+  `--use-fake-device-for-media-stream` + `permissions:['camera']`: the fake
+  device fills ALL THREE slots (camN=3, one stream per slot) and takePhoto
+  emits ONE `freecam3d_photo_*.zip` (per-cam JPEGs inside). Overriding
+  `getUserMedia` with `canvas.captureStream()` is weaker — a fresh context
+  enumerates zero devices, so `#selDev0` stays empty and `startCams` skips
+  every slot. Also: `log()`/`toast()` write DOM state, not console — assert
+  via `#logD` innerText / `document.body.innerText`.
 - Run exactly **one `agent-browser` command per bash invocation** (a chained
   connect+open+wait+get-title call hung >90 s; separate calls are instant).
   `get title` reads selftest results headlessly (e.g. `SELFTEST 28/28` over
