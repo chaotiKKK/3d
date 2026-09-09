@@ -13,12 +13,18 @@ Project: **FreeCam3D** — single-file HTML stereo 3D scanner PWA.
   fix lives in only one until explicitly merged — diff all three when porting).
 - Android PWA constraints (secure context, phone cam limits) are handled inside
   the app + documented in `README.md`.
-- **Git repository (since 2026-09-03):** initialized on `main` with root commit
-  `4cb41eb` containing exactly the four delivery files (index.html, README.md,
-  AGENTS.md, .freebuff/asset-handoff-explainer.html). The PWA shell
-  (manifest.webmanifest, sw.js, icon-*.png), `.agents/`/`.tools/`/`.build/`,
-  and `selftest-result.png` remain **untracked** — stage them explicitly if
-  they belong in the repo; do not `git add -A`.
+- **Git repository (since 2026-09-03):** root commit `4cb41eb` (the four delivery
+  files). Now tracked: the PWA shell (`manifest.webmanifest`, `sw.js`,
+  `icon-*.png` — over HTTP the app is broken without it: `sw.js` 404 → selftest
+  drops to 67/69), the CI harness (`.build/verdict.mjs`, `.build/verdict.test.mjs`,
+  `.build/ci-selftest.mjs`), the APK build system (`.build/apk/` source only —
+  `build-apk.sh` + `app/` manifest/MainActivity/res; `.build/apk/.gitignore`
+  keeps the local `jdk/`, `android-sdk/`, `webkit/` jars, `build/`, and
+  `debug.keystore` out), and `.github/workflows/selftest.yml`. Still untracked:
+  `desktop/` (abandoned Electron EXE scaffold), `.build/pw-venv` +
+  `.build/ui-smoke.py`, `FreeCam3D.apk` (build artifact — rebuild via the
+  committed script), `.agents/`/`.tools/`, `selftest-result.png` — stage
+  explicitly if needed; do not `git add -A`.
 
 ## Testing / verification
 - `?selftest` URL param runs the pure-logic assertions (CRC32/ZIP round-trip,
@@ -85,7 +91,8 @@ Project: **FreeCam3D** — single-file HTML stereo 3D scanner PWA.
   (secure context → getUserMedia works). Exports ride an injected `downloadBlob(blob,fn)`
   override → `FreeCamNative.saveB64` → MediaStore Downloads (API ≥29) / app dir (≤28).
   WebView has no service worker → the in-APK selftest reads 67/69 (the 2 `pwa:` checks
-  fail); expected, not a regression.
+  fail); expected, not a regression. `debug.keystore` is untracked — a regenerated
+  one changes the signature, so older phone installs must be uninstalled first.
 
 ## Architecture notes (post-fix)
 - **Depth pipeline is decoupled** from live video: `getGray`/`getRGB` take a

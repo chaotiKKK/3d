@@ -1,0 +1,8 @@
+# Local toolchain & generated artifacts — the committed source is enough to rebuild:
+# build-apk.sh fetches webkit deps, regenerates the keystore, and re-embeds app/assets.
+jdk/
+android-sdk/
+build/
+webkit/
+app/assets/
+debug.keystore
