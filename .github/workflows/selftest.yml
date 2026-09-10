@@ -19,6 +19,13 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Repeated pushes: cancel the superseded run instead of queueing behind it.
+# Grouped per ref, so a push to main never cancels a pull_request run and
+# vice versa (PRs get their own refs/pull/<n>/merge group).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   selftest:
     runs-on: ubuntu-latest
