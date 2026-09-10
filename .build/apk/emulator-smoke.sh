@@ -16,19 +16,23 @@ command -v adb >/dev/null || fail "adb not on PATH (install platform-tools)"
 adb get-state >/dev/null 2>&1 || fail "no android device/emulator attached (adb devices)"
 
 # --- resolve the app's DevTools socket (pid changes per launch) --------------
-PID="$(adb shell pidof com.freecam3d.app | tr -d '\r' | head -1)"
+# NOTE: pidof/grep exit 1 on no-match; with `set -euo pipefail` an unguarded
+# assignment dies silently before the fail() below can speak (observed on CI
+# where the app was installed but never launched). Every probing assignment
+# gets `|| true`; the explicit guards do the reporting.
+PID="$(adb shell pidof com.freecam3d.app 2>/dev/null | tr -d '\r' | head -1 || true)"
 if [ -z "$PID" ]; then
   echo "== app not running, launching =="
   for i in 1 2 3; do
     adb shell am start -W -n com.freecam3d.app/.MainActivity | grep -q "Status: ok" || { sleep 5; continue; }
     sleep 8
-    PID="$(adb shell pidof com.freecam3d.app | tr -d '\r' | head -1)"
+    PID="$(adb shell pidof com.freecam3d.app 2>/dev/null | tr -d '\r' | head -1 || true)"
     [ -n "$PID" ] && break
     sleep 5
   done
   [ -n "$PID" ] || fail "app process did not start (see adb logcat for the crash)"
 fi
-SOCK="$(adb shell cat /proc/net/unix | grep -oE "webview_devtools_remote_[0-9]+" | head -1)"
+SOCK="$(adb shell cat /proc/net/unix 2>/dev/null | grep -oE "webview_devtools_remote_[0-9]+" | head -1 || true)"
 [ -n "$SOCK" ] || fail "no webview_devtools_remote socket (WebView debugging disabled?)"
 adb forward tcp:9222 "localabstract:$SOCK" >/dev/null
 sleep 2
@@ -44,7 +48,7 @@ const v=document.createElement('video');v.muted=true;v.playsInline=true;
 const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
 v.srcObject=st;await v.play();await new Promise(r=>setTimeout(r,2000));
 const out={w:v.videoWidth,h:v.videoHeight};
-st.getTracks().forEach(t=>t.stop());v.remove();return out")"
+st.getTracks().forEach(t=>t.stop());v.remove();return out" || true)"
 echo "$CAMJSON" | grep -q '"w": 480\|"w": 640\|"w": 320\|"w": 1280\|"w": 1920' || fail "getUserMedia gave no frames: $CAMJSON"
 echo "  camera: $CAMJSON"
 
@@ -63,7 +67,7 @@ node cdp-verify.mjs "location.href=location.pathname+'?selftest';return 1" >/dev
 sleep 16
 TITLE="$(node cdp-verify.mjs "return document.title")"
 echo "$TITLE" | grep -q "SELFTEST 67/69" || fail "selftest title: $TITLE (want SELFTEST 67/69)"
-PWA_FAILS="$(adb logcat -d | grep -oE '\[selftest\] FAIL: .*' | tail -1)"
+PWA_FAILS="$(adb logcat -d 2>/dev/null | grep -oE '\[selftest\] FAIL: .*' | tail -1 || true)"
 echo "$PWA_FAILS" | grep -q "pwa:sw-registered, pwa:cache-primed" || fail "unexpected failing checks: $PWA_FAILS"
 echo "  selftest: $TITLE, failures exactly: pwa:sw-registered, pwa:cache-primed"
 
