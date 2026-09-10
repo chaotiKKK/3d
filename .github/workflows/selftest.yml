@@ -131,6 +131,12 @@ jobs:
 
       - name: Create + boot headless AVD
         run: |
+          # Pin the AVD home for BOTH tools: newer avdmanager defaults to
+          # $ANDROID_USER_HOME (~/.config/.android) while emulator 37 only
+          # searches $ANDROID_AVD_HOME, $ANDROID_SDK_HOME/avd, $HOME/.android/avd
+          # — unset, the emulator never finds the created AVD ("Unknown AVD name").
+          export ANDROID_AVD_HOME="$HOME/.android/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
           echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd \
             -n fc3d-ci -k "system-images;android-34;google_apis;x86_64" -d pixel_5 --force
           "$ANDROID_HOME/emulator/emulator" -avd fc3d-ci \
