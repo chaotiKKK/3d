@@ -111,13 +111,19 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Check KVM acceleration (required by the emulator)
+      - name: Enable KVM acceleration (required by the emulator)
         run: |
           if [ ! -e /dev/kvm ]; then
             echo "::error::/dev/kvm not available — KVM is required for the emulator on hosted runners"
             exit 1
           fi
-          if command -v kvm-ok > /dev/null; then kvm-ok; else echo "/dev/kvm present (kvm-ok not installed)"; fi
+          # /dev/kvm exists but the runner user is not in the kvm group
+          # ("This user doesn't have permissions to use KVM"). Canonical
+          # hosted-runner fix: udev rule granting mode 0666 on the node.
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
 
       - uses: actions/setup-java@v4
         with:
