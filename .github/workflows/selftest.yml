@@ -143,6 +143,8 @@ jobs:
           # — unset, the emulator never finds the created AVD ("Unknown AVD name").
           export ANDROID_AVD_HOME="$HOME/.android/avd"
           mkdir -p "$ANDROID_AVD_HOME"
+          # bare `adb` is not on the hosted-runner PATH; platform-tools is.
+          export PATH="$ANDROID_HOME/platform-tools:$PATH"
           # Start the adb daemon BEFORE the emulator: the emulator registers
           # itself with adb during boot, and on a cold runner no daemon is
           # listening yet — registration fails and the device stays "offline"
@@ -165,11 +167,14 @@ jobs:
 
       - name: Install APK + pre-grant camera
         run: |
+          export PATH="$ANDROID_HOME/platform-tools:$PATH"
           adb install -r FreeCam3D.apk
           adb shell pm grant com.freecam3d.app android.permission.CAMERA
 
       - name: Run on-emulator smoke (camera bridge, MediaStore export, selftest)
-        run: bash .build/apk/emulator-smoke.sh
+        run: |
+          export PATH="$ANDROID_HOME/platform-tools:$PATH"
+          bash .build/apk/emulator-smoke.sh
 
       - name: Upload emulator log
         if: failure()
