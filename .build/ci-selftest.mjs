@@ -28,8 +28,11 @@ const BROWSERS = [
   '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
 ];
 
-const TITLE_TIMEOUT_MS = 30000;
-const TARGET_TIMEOUT_MS = 20000;
+const TITLE_TIMEOUT_MS = 60000;
+// Cold hosted runners (fresh container, slow first paint) have taken >20 s
+// to reach a page target — a deadline this tight killed a run that passed
+// twice before. It is only consumed when launch genuinely fails.
+const TARGET_TIMEOUT_MS = 45000;
 const POLL_MS = 300;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

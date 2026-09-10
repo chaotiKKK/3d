@@ -143,6 +143,11 @@ jobs:
           # — unset, the emulator never finds the created AVD ("Unknown AVD name").
           export ANDROID_AVD_HOME="$HOME/.android/avd"
           mkdir -p "$ANDROID_AVD_HOME"
+          # Start the adb daemon BEFORE the emulator: the emulator registers
+          # itself with adb during boot, and on a cold runner no daemon is
+          # listening yet — registration fails and the device stays "offline"
+          # forever even though the guest finished booting.
+          adb start-server
           echo no | "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd \
             -n fc3d-ci -k "system-images;android-34;google_apis;x86_64" -d pixel_5 --force
           "$ANDROID_HOME/emulator/emulator" -avd fc3d-ci \
@@ -151,7 +156,7 @@ jobs:
             -gpu swiftshader_indirect -no-snapshot \
             > /tmp/emulator-ci.log 2>&1 &
           echo "emulator pid $!"
-          timeout 420 bash -c 'while [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" != "1" ]; do sleep 5; done' \
+          timeout 420 bash -c 'adb wait-for-device || exit 1; while [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" != "1" ]; do sleep 5; done' \
             || { echo "::error::emulator did not boot in 420s"; tail -30 /tmp/emulator-ci.log; exit 1; }
           echo "BOOTED"
 
