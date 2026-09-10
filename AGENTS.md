@@ -22,10 +22,11 @@ Project: **FreeCam3D** — single-file HTML stereo 3D scanner PWA.
   keeps the local `jdk/`, `android-sdk/`, `webkit/` jars, `build/`, and
   `debug.keystore` out),  and `.github/workflows/selftest.yml` + `.build/ui-smoke.py` (the
   Playwright UI smoke the workflow's `ui-smoke` job runs; pinned
-  playwright==1.62.0). Still untracked: `desktop/` (abandoned Electron EXE
+  playwright==1.62.0). `FreeCam3D.apk` is TRACKED since `79193a2` (ship-in-repo:
+  rebuilt via the committed script before every APK commit — never hand-edit the
+  binary). Still untracked: `desktop/` (abandoned Electron EXE
   scaffold), `.build/pw-venv` (local Playwright venv) + `.build/ui-shots/`
-  (smoke screenshots), `FreeCam3D.apk` (build artifact — rebuild via the
-  committed script), `.agents/`/`.tools/`, `selftest-result.png` — stage
+  (smoke screenshots), `.agents/`/`.tools/`, `selftest-result.png` — stage
   explicitly if needed; do not `git add -A`.
 
 ## Testing / verification
