@@ -99,7 +99,7 @@ jobs:
 
       - name: Verify signature + badging + embedded webapp byte-identity
         run: |
-          "$ANDROID_HOME/build-tools/34.0.0/apksigner verify --print-certs FreeCam3D.apk"
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --print-certs FreeCam3D.apk
           "$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging FreeCam3D.apk | grep -E "package:|launchable-activity|uses-permission"
           mkdir -p /tmp/apkcheck && cd /tmp/apkcheck
           unzip -o -q "$GITHUB_WORKSPACE/FreeCam3D.apk" assets/index.html
