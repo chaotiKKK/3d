@@ -11,6 +11,13 @@ Project: **FreeCam3D** — single-file HTML stereo 3D scanner PWA.
   defensive `refreshDevices` — only that change; it is a **sibling** of
   `index.html`, not its ancestor (both derive independently from 3d.html, and a
   fix lives in only one until explicitly merged — diff all three when porting).
+  The desktop job in `.github/workflows/selftest.yml` (tag/manual only,
+  windows-latest) builds the Electron EXE, selfchecks it (69/69), zips it, and
+  attaches `FreeCam3D-win32-x64.zip` to the tag's GitHub Release via
+  `gh release upload --clobber` with the workflow token (the local detached
+  8080 server and the EXE/ZIP recipes: `npm run pack` in `desktop/` →
+  `dist/FreeCam3D-win32-x64/`, `--selfcheck` runs the full selftest incl. the
+  2 SW checks over loopback HTTP).
 - Android PWA constraints (secure context, phone cam limits) are handled inside
   the app + documented in `README.md`.
 - **Git repository (since 2026-09-03):** root commit `4cb41eb` (the four delivery
@@ -24,8 +31,9 @@ Project: **FreeCam3D** — single-file HTML stereo 3D scanner PWA.
   Playwright UI smoke the workflow's `ui-smoke` job runs; pinned
   playwright==1.62.0). `FreeCam3D.apk` is TRACKED since `79193a2` (ship-in-repo:
   rebuilt via the committed script before every APK commit — never hand-edit the
-  binary). Still untracked: `desktop/` (abandoned Electron EXE
-  scaffold), `.build/pw-venv` (local Playwright venv) + `.build/ui-shots/`
+  binary). Still untracked: `desktop/` is TRACKED since the desktop-CI commit (source:
+  `main.js`, `package.json`, `package-lock.json`, `scripts/copy-app.mjs`;
+  `node_modules/`, `app/`, `dist/` stay out via `desktop/.gitignore`). `.build/pw-venv` (local Playwright venv) + `.build/ui-shots/`
   (smoke screenshots), `.agents/`/`.tools/`, `selftest-result.png` — stage
   explicitly if needed; do not `git add -A`.
 
@@ -124,7 +132,9 @@ Project: **FreeCam3D** — single-file HTML stereo 3D scanner PWA.
   against a running AVD/app) and as the workflow's `apk-emulator` job (CI: KVM check,
   sdkmanager emulator+image, headless AVD boot with a 420 s timeout, install,
   pre-grant CAMERA, smoke); the script launches the app itself with retries and
-  derives the DevTools socket from `/proc/net/unix` — no hardcoded pid.
+  derives the DevTools socket from `/proc/net/unix` — no hardcoded pid. The
+  workflow's `desktop` job mirrors this for the Windows Electron shell (tag/
+  manual only — build, --selfcheck, ZIP attached to the tag's release).
 
 ## Architecture notes (post-fix)
 - **Depth pipeline is decoupled** from live video: `getGray`/`getRGB` take a

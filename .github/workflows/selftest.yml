@@ -13,6 +13,10 @@
 # runs the on-emulator checks (secure context, camera bridge, MediaStore
 # export, in-APK selftest 67/69) through cdp-verify.mjs — the CI mirror of
 # the local AVD verification recipe.
+# desktop is the fifth (tag/manual only): builds the Windows Electron EXE
+# on windows-latest, verifies it via its own --selfcheck (full 69/69 incl.
+# the SW checks over loopback HTTP), and attaches the ZIP to the tag's
+# GitHub Release — the distribution mirror of FreeCam3D.apk.
 name: selftest
 on:
   push:
@@ -30,9 +34,9 @@ jobs:
   selftest:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
@@ -53,7 +57,7 @@ jobs:
   ui-smoke:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v5
         with:
@@ -77,7 +81,7 @@ jobs:
 
       - name: Upload smoke screenshots
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ui-smoke-shots
           path: .build/ui-shots/
@@ -86,9 +90,9 @@ jobs:
   apk:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
@@ -109,7 +113,7 @@ jobs:
   apk-emulator:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Enable KVM acceleration (required by the emulator)
         run: |
@@ -125,7 +129,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
           ls -l /dev/kvm
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
@@ -178,8 +182,56 @@ jobs:
 
       - name: Upload emulator log
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: emulator-log
           path: /tmp/emulator-ci.log
           retention-days: 7
+
+  desktop:
+    # Windows EXE on every tag (release asset) and on demand. Push builds
+    # stay on the four fast jobs — the Electron download + package cost is
+    # not worth paying on every commit.
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Install desktop deps (Electron + packager)
+        working-directory: desktop
+        run: npm ci
+
+      - name: Package Windows EXE
+        working-directory: desktop
+        run: npm run pack
+
+      - name: Selfcheck the packaged EXE (69/69 incl. SW checks)
+        working-directory: desktop/dist/FreeCam3D-win32-x64
+        run: ./FreeCam3D.exe --selfcheck
+
+      - name: Zip the distribution
+        working-directory: desktop/dist
+        run: powershell -NoProfile -Command "Compress-Archive -Path FreeCam3D-win32-x64 -DestinationPath FreeCam3D-win32-x64.zip -CompressionLevel Optimal -Force"
+
+      - name: Upload ZIP artifact (always, for non-tag runs)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: FreeCam3D-win32-x64-zip
+          path: desktop/dist/FreeCam3D-win32-x64.zip
+          retention-days: 14
+
+      - name: Attach ZIP to the tag's release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${GITHUB_REF_NAME}" desktop/dist/FreeCam3D-win32-x64.zip --repo "$GITHUB_REPOSITORY" --clobber

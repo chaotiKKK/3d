@@ -1,0 +1,18 @@
+{
+  "name": "freecam3d-desktop",
+  "productName": "FreeCam3D",
+  "version": "1.0.0",
+  "description": "FreeCam3D as a Windows desktop app (Electron shell around the single-file PWA).",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "copy-app": "node scripts/copy-app.mjs",
+    "pack": "npm run copy-app && electron-packager . FreeCam3D --platform=win32 --arch=x64 --out=dist --overwrite --prune=true",
+    "build": "npm run pack"
+  },
+  "devDependencies": {
+    "electron": "^44.2.0",
+    "electron-packager": "^17.1.2"
+  }
+}
