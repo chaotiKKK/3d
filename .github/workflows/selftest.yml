@@ -193,6 +193,13 @@ jobs:
     # stay on the four fast jobs — the Electron download + package cost is
     # not worth paying on every commit.
     if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    # The repo's default_workflow_permissions is `read` (the recommended
+    # setting); the release-attach step needs contents:write, so grant it
+    # here and only here. Verified against GitHub docs: the permissions key
+    # overrides the default — docs.github.com "Use GITHUB_TOKEN for
+    # authentication in workflows", "Modifying the permissions".
+    permissions:
+      contents: write
     runs-on: windows-latest
     defaults:
       run:
