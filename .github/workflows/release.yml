@@ -72,6 +72,9 @@ jobs:
       - name: Tag the current commit and push it
         id: make
         run: |
+          # runners have no git identity; the annotated tag needs one
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag -a "${{ steps.version.outputs.tag }}" \
             -m "FreeCam3D ${{ steps.version.outputs.tag }} (built by CI)"
           git push origin "${{ steps.version.outputs.tag }}"
