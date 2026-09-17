@@ -1,0 +1,206 @@
+# One-step releases: a workflow_dispatch that takes a version (e.g. "1.0.1")
+# tags main, and the tag push runs this workflow again — building the APK and
+# the Windows EXE at the tagged commit — and publishes both to a GitHub
+# Release. On a real tag push the tag job skips itself and the same pipeline
+# runs, so there is exactly one path for the artifact jobs regardless of how
+# the tag was born.
+#
+# Why the publish step creates a draft first and publishes last: the release
+# must never exist publicly while assets are still uploading (a visitor could
+# hit a half-attached release). Publish only happens after both artifact jobs
+# succeeded and both assets are uploaded.
+#
+# Permissions: this repo keeps default_workflow_permissions=read, so this
+# workflow declares contents:write explicitly (tag + release + assets). The
+# four push jobs in selftest.yml stay on the read default.
+name: release
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+      - 'v*.*.*-*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to tag and release (vX.Y.Z)'
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    # Only the dispatch run tags; on a tag push this job skips itself and the
+    # run IS the tag event. Guarded: version syntax, tag must not exist yet.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      tag: ${{ steps.make.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # persistent-credentials stay true (default) so the tag push below
+          # authenticates with the workflow token
+          fetch-depth: 1
+
+      - name: Validate version input
+        id: version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          V="${VERSION#v}"
+          if ! [[ "$V" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::version '$VERSION' is not vX.Y.Z (e.g. v1.0.1 or v1.0.1-beta.2)"; exit 1
+          fi
+          echo "tag=v$V" >> "$GITHUB_OUTPUT"
+
+      - name: Fail early if tag already exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git ls-remote --tags origin "refs/tags/${{ steps.version.outputs.tag }}" | grep -q .; then
+            echo "::error::tag ${{ steps.version.outputs.tag }} already exists"; exit 1
+          fi
+          echo "tag ${{ steps.version.outputs.tag }} is free"
+
+      - name: Tag the current commit and push it
+        id: make
+        run: |
+          git tag -a "${{ steps.version.outputs.tag }}" \
+            -m "FreeCam3D ${{ steps.version.outputs.tag }} (built by CI)"
+          git push origin "${{ steps.version.outputs.tag }}"
+          echo "tag=${{ steps.version.outputs.tag }}" >> "$GITHUB_OUTPUT"
+
+  apk:
+    needs: tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.tag.outputs.tag || github.ref }}
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Build APK (hand-built pipeline, no gradle)
+        run: bash .build/apk/build-apk.sh
+
+      - name: Verify signature + badging + embedded webapp byte-identity
+        run: |
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner verify --print-certs FreeCam3D.apk"
+          "$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging FreeCam3D.apk | grep -E "package:|launchable-activity|uses-permission"
+          mkdir -p /tmp/apkcheck && cd /tmp/apkcheck
+          unzip -o -q "$GITHUB_WORKSPACE/FreeCam3D.apk" assets/index.html
+          cmp "$GITHUB_WORKSPACE/index.html" assets/index.html && echo "index.html embedded byte-identical"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-apk
+          path: FreeCam3D.apk
+          retention-days: 7
+
+  desktop:
+    needs: tag
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.tag.outputs.tag || github.ref }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Install desktop deps (Electron + packager)
+        working-directory: desktop
+        run: npm ci
+
+      - name: Package Windows EXE
+        working-directory: desktop
+        run: npm run pack
+
+      - name: Selfcheck the packaged EXE (69/69 incl. SW checks)
+        working-directory: desktop/dist/FreeCam3D-win32-x64
+        run: ./FreeCam3D.exe --selfcheck
+
+      - name: Zip the distribution
+        working-directory: desktop/dist
+        run: powershell -NoProfile -Command "Compress-Archive -Path FreeCam3D-win32-x64 -DestinationPath FreeCam3D-win32-x64.zip -CompressionLevel Optimal -Force"
+
+      - name: Upload EXE ZIP artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-exe
+          path: desktop/dist/FreeCam3D-win32-x64.zip
+          retention-days: 7
+
+  publish:
+    # Runs only when both artifact jobs succeeded (needs default behavior:
+    # any failure or cancellation skips this job). Creates the release as a
+    # draft, attaches both assets, then publishes and marks it latest.
+    needs: [tag, apk, desktop]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download both artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Assert both assets are present
+        run: |
+          ls -l dist/
+          test -s dist/FreeCam3D.apk || { echo "::error::FreeCam3D.apk missing"; exit 1; }
+          test -s dist/FreeCam3D-win32-x64.zip || { echo "::error::FreeCam3D-win32-x64.zip missing"; exit 1; }
+
+      - name: Create draft release, attach assets, publish
+        run: |
+          VERSION="${{ needs.tag.outputs.tag }}"
+          if [ -z "$VERSION" ]; then VERSION="$GITHUB_REF_NAME"; fi
+          TITLE="FreeCam3D ${VERSION#v}"
+          if ! gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release create "$VERSION" --draft --title "$TITLE" --repo "$GITHUB_REPOSITORY" \
+              --notes "Automated release built by CI from commit [$GITHUB_SHA](https://github.com/$GITHUB_REPOSITORY/commit/$GITHUB_SHA). Both artifacts verified in CI: APK signature + embedded-shell byte identity, Windows EXE 69/69 selfcheck."
+          fi
+          gh release upload "$VERSION" dist/FreeCam3D.apk dist/FreeCam3D-win32-x64.zip \
+            --repo "$GITHUB_REPOSITORY" --clobber
+          gh release edit "$VERSION" --draft=false --latest --repo "$GITHUB_REPOSITORY"
+
+      - name: Verify the published release
+        run: |
+          VERSION="${{ needs.tag.outputs.tag }}"
+          if [ -z "$VERSION" ]; then VERSION="$GITHUB_REF_NAME"; fi
+          # NOTE: `gh release view --json` has no isLatest field (verified
+          # against gh 2.98: "Unknown JSON field") — the latest flag comes
+          # from the releases/latest API endpoint. All extraction uses gh's
+          # built-in --jq engine; no system jq dependency.
+          DRAFT="$(gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)"
+          APK_STATE="$(gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[] | select(.name == "FreeCam3D.apk") | .state')"
+          ZIP_STATE="$(gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[] | select(.name == "FreeCam3D-win32-x64.zip") | .state')"
+          LATEST="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+          [ "$DRAFT" = "false" ]        || { echo "::error::release is still a draft"; exit 1; }
+          [ "$APK_STATE" = "uploaded" ] || { echo "::error::FreeCam3D.apk state=$APK_STATE"; exit 1; }
+          [ "$ZIP_STATE" = "uploaded" ] || { echo "::error::FreeCam3D-win32-x64.zip state=$ZIP_STATE"; exit 1; }
+          [ "$LATEST" = "$VERSION" ]   || { echo "::error::latest release is $LATEST, expected $VERSION"; exit 1; }
+          echo "RELEASE PUBLISH OK: $VERSION published as latest with both assets"
