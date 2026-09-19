@@ -188,6 +188,7 @@ Project: **FreeCam3D** — single-file HTML stereo 3D scanner PWA.
   and adds one gated `worker:disp==mainthread` parity check.
 
 ## Gotchas when editing
+- Repo `.ps1`/`.nsi` scripts (desktop/installer/) must stay ASCII-safe and UTF-8 **with BOM**: PS 5.1 reads BOM-less scripts as ANSI, so an em-dash silently corrupts parsing (symptom: bogus "unterminated string" pointing at a byte-clean line). Verify with the AST Parser (`[System.Management.Automation.Language.Parser]::ParseFile`), never eyeballs. Also: jq in `gh --jq` binds `and` tighter than pipeline order — filter `.name` strings first, then `select(startswith() and endswith())`, or `endswith` receives the asset object.
 - The file is one big `<script>`; keep it dependency-free (no npm/external libs).
 - ZIP helpers assume no data descriptors and sizes from central-directory records
   (true for everything this app writes and for Explorer/`zip`-style writers);
