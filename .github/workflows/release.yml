@@ -210,7 +210,7 @@ jobs:
           # built-in --jq engine; no system jq dependency.
           DRAFT="$(gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)"
           APK_STATE="$(gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[] | select(.name == "FreeCam3D.apk") | .state')"
-          SETUP_COUNT="$(gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" --json assets --jq '[.assets[] | select(.name | startswith("FreeCam3D-Setup-")) and (endswith(".exe"))] | length')"
+          SETUP_COUNT="$(gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" --json assets --jq '[.assets[].name | select(startswith("FreeCam3D-Setup-") and endswith(".exe"))] | length')"
           LATEST="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
           [ "$DRAFT" = "false" ]        || { echo "::error::release is still a draft"; exit 1; }
           [ "$APK_STATE" = "uploaded" ] || { echo "::error::FreeCam3D.apk state=$APK_STATE"; exit 1; }
