@@ -12,18 +12,32 @@ Project: **FreeCam3D** — single-file HTML stereo 3D scanner PWA.
   `index.html`, not its ancestor (both derive independently from 3d.html, and a
   fix lives in only one until explicitly merged — diff all three when porting).
   The desktop job in `.github/workflows/selftest.yml` (manual dispatch only,
-  windows-latest) builds the Electron EXE and selfchecks it (69/69) as
-  release QA (the local detached
-  8080 server and the EXE/ZIP recipes: `npm run pack` in `desktop/` →
+  windows-latest) builds the Electron EXE, selfchecks it (69/69), then builds +
+  signs the NSIS installer via the shared recipe
+  `desktop/installer/build-signed-installer.sh` as release QA (the local detached
+  8080 server and the EXE recipe: `npm run pack` in `desktop/` →
   `dist/FreeCam3D-win32-x64/`, `--selfcheck` runs the full selftest incl. the
   2 SW checks over loopback HTTP). Releases are fully automated in
   `.github/workflows/release.yml`: one `workflow_dispatch` with a `version`
-  input (vX.Y.Z) tags main, the tag push builds APK + EXE at the tagged
-  commit, and the `publish` job creates a draft release, attaches both
-  assets, and publishes it (`gh release edit --draft=false --latest`). One
+  input (vX.Y.Z) tags main, the tag push builds APK + the **signed installer**
+  at the tagged commit, and the `publish` job creates a draft release, attaches
+  APK + `FreeCam3D-Setup-*.exe` (no plain ZIP anymore), and publishes it
+  (`gh release edit --draft=false --latest`). One
   release-writing workflow — selftest.yml holds no release writes; the
   publish step asserts both assets are `uploaded` and not draft before
   exiting green.
+  Windows distribution is a **signed per-user NSIS installer**
+  (`desktop/installer/`): `installer.nsi` (installs to
+  `%LOCALAPPDATA%\Programs\FreeCam3D`, no elevation, `/S`-capable install
+  AND uninstall, HKCU ARP entry) built by `make-installer.mjs` (NSIS version
+  resources need X.Y.Z; `EstimatedSize` computed by walking the payload),
+  signed by `sign.ps1` + verified by `verify-signature.ps1` (thumbprint +
+  timestamp, deliberately NOT trust-store-based). Signing: Authenticode via
+  `Set-AuthenticodeSignature` + DigiCert timestamp; cert is **self-signed**
+  (test-quality, like the APK debug keystore → SmartScreen "unknown
+  publisher" on other machines) unless `CODESIGN_PFX` env/secret is set —
+  a real CA cert later is a secret swap, nothing else. Both EXEs are signed:
+  the app exe BEFORE `makensis` wraps it, the setup exe after.
 - Android PWA constraints (secure context, phone cam limits) are handled inside
   the app + documented in `README.md`.
 - **Git repository (since 2026-09-03):** root commit `4cb41eb` (the four delivery
@@ -140,8 +154,8 @@ Project: **FreeCam3D** — single-file HTML stereo 3D scanner PWA.
   pre-grant CAMERA, smoke); the script launches the app itself with retries and
   derives the DevTools socket from `/proc/net/unix` — no hardcoded pid. The
   workflow's `desktop` job mirrors this for the Windows Electron shell
-  (manual dispatch — build, --selfcheck; release builds live in
-  release.yml).
+  (manual dispatch — build, --selfcheck, installer build + signature;
+  release builds live in release.yml).
 
 ## Architecture notes (post-fix)
 - **Depth pipeline is decoupled** from live video: `getGray`/`getRGB` take a

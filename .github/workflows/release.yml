@@ -134,6 +134,9 @@ jobs:
         working-directory: desktop
         run: npm ci
 
+      - name: Install NSIS (choco; recipe probes C:\Program Files (x86)\NSIS)
+        run: choco install nsis -y --no-progress
+
       - name: Package Windows EXE
         working-directory: desktop
         run: npm run pack
@@ -142,15 +145,21 @@ jobs:
         working-directory: desktop/dist/FreeCam3D-win32-x64
         run: ./FreeCam3D.exe --selfcheck
 
-      - name: Zip the distribution
-        working-directory: desktop/dist
-        run: powershell -NoProfile -Command "Compress-Archive -Path FreeCam3D-win32-x64 -DestinationPath FreeCam3D-win32-x64.zip -CompressionLevel Optimal -Force"
+      - name: Build + sign the NSIS installer (replaces the plain ZIP)
+        env:
+          VERSION: ${{ needs.tag.outputs.tag || github.ref_name }}
+        run: |
+          # The recipe falls back to a locally generated self-signed cert when
+          # CODESIGN_PFX is unset (test-quality, like the APK debug keystore).
+          # A real certificate later means: set the secret, nothing else.
+          unset CODESIGN_PFX
+          bash desktop/installer/build-signed-installer.sh
 
-      - name: Upload EXE ZIP artifact
+      - name: Upload installer artifact
         uses: actions/upload-artifact@v7
         with:
           name: release-exe
-          path: desktop/dist/FreeCam3D-win32-x64.zip
+          path: desktop/dist/FreeCam3D-Setup-*.exe
           retention-days: 7
 
   publish:
@@ -175,7 +184,8 @@ jobs:
         run: |
           ls -l dist/
           test -s dist/FreeCam3D.apk || { echo "::error::FreeCam3D.apk missing"; exit 1; }
-          test -s dist/FreeCam3D-win32-x64.zip || { echo "::error::FreeCam3D-win32-x64.zip missing"; exit 1; }
+          SETUP="$(ls dist/FreeCam3D-Setup-*.exe 2>/dev/null | head -1)"
+          [ -n "$SETUP" ] && [ -s "$SETUP" ] || { echo "::error::FreeCam3D-Setup-*.exe missing"; exit 1; }
 
       - name: Create draft release, attach assets, publish
         run: |
@@ -184,9 +194,9 @@ jobs:
           TITLE="FreeCam3D ${VERSION#v}"
           if ! gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
             gh release create "$VERSION" --draft --title "$TITLE" --repo "$GITHUB_REPOSITORY" \
-              --notes "Automated release built by CI from commit [$GITHUB_SHA](https://github.com/$GITHUB_REPOSITORY/commit/$GITHUB_SHA). Both artifacts verified in CI: APK signature + embedded-shell byte identity, Windows EXE 69/69 selfcheck."
+              --notes "Automated release built by CI from commit [$GITHUB_SHA](https://github.com/$GITHUB_REPOSITORY/commit/$GITHUB_SHA). Both artifacts verified in CI: APK signature + embedded-shell byte identity, Windows installer built + Authenticode-signed (69/69 selfcheck of the packaged EXE before install wrapping)."
           fi
-          gh release upload "$VERSION" dist/FreeCam3D.apk dist/FreeCam3D-win32-x64.zip \
+          gh release upload "$VERSION" dist/FreeCam3D.apk dist/FreeCam3D-Setup-*.exe \
             --repo "$GITHUB_REPOSITORY" --clobber
           gh release edit "$VERSION" --draft=false --latest --repo "$GITHUB_REPOSITORY"
 
@@ -200,10 +210,10 @@ jobs:
           # built-in --jq engine; no system jq dependency.
           DRAFT="$(gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)"
           APK_STATE="$(gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[] | select(.name == "FreeCam3D.apk") | .state')"
-          ZIP_STATE="$(gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[] | select(.name == "FreeCam3D-win32-x64.zip") | .state')"
+          SETUP_COUNT="$(gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" --json assets --jq '[.assets[] | select(.name | startswith("FreeCam3D-Setup-")) and (endswith(".exe"))] | length')"
           LATEST="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
           [ "$DRAFT" = "false" ]        || { echo "::error::release is still a draft"; exit 1; }
           [ "$APK_STATE" = "uploaded" ] || { echo "::error::FreeCam3D.apk state=$APK_STATE"; exit 1; }
-          [ "$ZIP_STATE" = "uploaded" ] || { echo "::error::FreeCam3D-win32-x64.zip state=$ZIP_STATE"; exit 1; }
-          [ "$LATEST" = "$VERSION" ]   || { echo "::error::latest release is $LATEST, expected $VERSION"; exit 1; }
-          echo "RELEASE PUBLISH OK: $VERSION published as latest with both assets"
+          [ "$SETUP_COUNT" -ge 1 ]      || { echo "::error::no FreeCam3D-Setup-*.exe asset uploaded"; exit 1; }
+          [ "$LATEST" = "$VERSION" ]    || { echo "::error::latest release is $LATEST, expected $VERSION"; exit 1; }
+          echo "RELEASE PUBLISH OK: $VERSION published as latest with APK + signed installer"

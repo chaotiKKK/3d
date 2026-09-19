@@ -9,7 +9,8 @@
     "start": "electron .",
     "copy-app": "node scripts/copy-app.mjs",
     "pack": "npm run copy-app && electron-packager . FreeCam3D --platform=win32 --arch=x64 --out=dist --overwrite --prune=true",
-    "build": "npm run pack"
+    "installer": "node installer/make-installer.mjs",
+    "build": "npm run pack && npm run installer"
   },
   "devDependencies": {
     "electron": "^44.2.0",

@@ -214,6 +214,9 @@ jobs:
         working-directory: desktop
         run: npm ci
 
+      - name: Install NSIS (choco; recipe probes C:\Program Files (x86)\NSIS)
+        run: choco install nsis -y --no-progress
+
       - name: Package Windows EXE
         working-directory: desktop
         run: npm run pack
@@ -222,14 +225,13 @@ jobs:
         working-directory: desktop/dist/FreeCam3D-win32-x64
         run: ./FreeCam3D.exe --selfcheck
 
-      - name: Zip the distribution
-        working-directory: desktop/dist
-        run: powershell -NoProfile -Command "Compress-Archive -Path FreeCam3D-win32-x64 -DestinationPath FreeCam3D-win32-x64.zip -CompressionLevel Optimal -Force"
+      - name: Build + sign the NSIS installer (QA - same recipe as release.yml)
+        run: bash desktop/installer/build-signed-installer.sh
 
-      - name: Upload ZIP artifact
+      - name: Upload installer artifact
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: FreeCam3D-win32-x64-zip
-          path: desktop/dist/FreeCam3D-win32-x64.zip
+          name: FreeCam3D-setup-exe
+          path: desktop/dist/FreeCam3D-Setup-*.exe
           retention-days: 14

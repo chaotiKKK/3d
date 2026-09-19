@@ -13,7 +13,6 @@ Tiefenkarte → Punktwolke (PLY/OBJ) — alles im Browser, installierbar & offli
 | `icon-192.png`, `icon-512.png` | Icons (auch maskable) |
 
 ## Hosting & Installation (Android)
-
 1. **Dateien über HTTPS hosten** — jede statische Hosting-Plattform (GitHub Pages,
    Netlify, Vercel, Cloudflare Pages) reicht; einfach diesen Ordner hochladen.
    Wichtig: **HTTPS ist Pflicht** — Kamera-Zugriff, Service Worker und der
@@ -32,6 +31,22 @@ Tiefenkarte → Punktwolke (PLY/OBJ) — alles im Browser, installierbar & offli
    „Update on reload“ aktivieren oder einmal „Unregister“ + „Clear site data“
    ausführen — ein harter Reload (`Ctrl+Shift+R`) genügt **nicht**, weil der
    Service Worker selbst aus dem Cache antwortet.
+
+## Installation (Windows)
+
+- **Installer:** Auf der [GitHub-Releases-Seite](https://github.com/chaotiKKK/3d/releases)
+  die `FreeCam3D-Setup-vX.Y.Z.exe` herunterladen und starten. Per-user-Install
+  nach `%LOCALAPPDATA%\Programs\FreeCam3D` — **kein Administrator** nötig;
+  Startmenü- und Desktop-Verknüpfung werden angelegt, Deinstallation über
+  Windows-Einstellungen → Apps. Der Installer ist Authenticode-signiert
+  (Timestamp via DigiCert); das Zertifikat ist derzeit **selbstsigniert**, d. h.
+  Windows zeigt beim ersten Start eine SmartScreen-Warnung („unbekannter
+  Herausgeber") — „Weitere Informationen → Trotzdem ausführen“. Stille
+  Installation/Deinstallation für Skripte: `FreeCam3D-Setup.exe /S` bzw.
+  `uninstall.exe /S`.
+- **Portable Nutzung ohne Installation:** das gepackte Verzeichnis
+  `desktop/dist/FreeCam3D-win32-x64/` nach `npm run pack` direkt starten —
+  die App ist selbst-contained.
 
 ## Bedienung
 
